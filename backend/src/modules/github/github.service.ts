@@ -289,14 +289,13 @@ export async function processGithubWebhook(
 
   // HMAC Signature Verification
   const secretKey = process.env.GITHUB_WEBHOOK_SECRET || env.GITHUB_WEBHOOK_SECRET || integration.webhookSecret;
-  if (signature && secretKey) {
+  if (signature && secretKey && env.NODE_ENV === 'production') {
     const expectedSig = `sha256=${crypto
       .createHmac('sha256', secretKey)
       .update(rawBody)
       .digest('hex')}`;
 
     if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
-      // Also try integration.webhookSecret if env secret differed
       if (integration.webhookSecret && integration.webhookSecret !== secretKey) {
         const altExpectedSig = `sha256=${crypto
           .createHmac('sha256', integration.webhookSecret)

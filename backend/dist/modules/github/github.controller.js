@@ -119,10 +119,12 @@ export async function githubWebhookController(request, reply) {
         const signature = request.headers['x-hub-signature-256'];
         const eventType = request.headers['x-github-event'];
         const rawBody = request.raw.rawBody || JSON.stringify(request.body);
+        request.log.info({ eventType, repo: request.body?.repository?.full_name }, 'Received GitHub Webhook');
         const result = await processGithubWebhook(signature, eventType, request.body, rawBody);
         return reply.send(result);
     }
     catch (error) {
+        request.log.error(error, 'GitHub Webhook Error');
         if (error instanceof GithubError)
             return reply.code(401).send({ message: error.message });
         return reply.code(500).send({ message: 'Webhook processing error' });
