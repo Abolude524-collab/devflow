@@ -345,7 +345,7 @@ export async function processGithubWebhook(
         }
       }
 
-      await GithubActivityModel.create({
+      const newAct = await GithubActivityModel.create({
         taskId: matchedTask?._id || undefined,
         projectId: integration.projectId,
         type: 'commit',
@@ -356,6 +356,7 @@ export async function processGithubWebhook(
         action: 'pushed',
       });
 
+      emitTaskChange(String(integration.projectId), 'github:activity', newAct);
       processedCount++;
     }
   }
@@ -389,7 +390,7 @@ export async function processGithubWebhook(
       }
     }
 
-    await GithubActivityModel.create({
+    const newAct = await GithubActivityModel.create({
       taskId: matchedTask?._id || undefined,
       projectId: integration.projectId,
       type: 'pull_request',
@@ -400,6 +401,7 @@ export async function processGithubWebhook(
       action: actionName,
     });
 
+    emitTaskChange(String(integration.projectId), 'github:activity', newAct);
     processedCount++;
   }
 
@@ -424,7 +426,7 @@ export async function processGithubWebhook(
       }
     }
 
-    await GithubActivityModel.create({
+    const newAct = await GithubActivityModel.create({
       taskId: matchedTask?._id || undefined,
       projectId: integration.projectId,
       type: 'branch',
@@ -435,6 +437,7 @@ export async function processGithubWebhook(
       action: 'pushed',
     });
 
+    emitTaskChange(String(integration.projectId), 'github:activity', newAct);
     processedCount++;
   }
 

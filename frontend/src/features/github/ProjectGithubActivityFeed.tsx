@@ -25,9 +25,15 @@ export const ProjectGithubActivityFeed: React.FC<ProjectGithubActivityFeedProps>
         <div className="flex items-center gap-2.5">
           <span className="text-lg">🐙</span>
           <div>
-            <h3 className="text-sm font-bold text-devflow-text">GitHub Project Activity Stream</h3>
-            <p className="text-[11px] text-devflow-muted">
-              Live log of commits, branches, and Pull Requests linked to this project
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-devflow-text">GitHub Project Activity Stream</h3>
+              <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Sync
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-devflow-muted">
+              Real-time log of commits, branches, and Pull Requests linked to this project
             </p>
           </div>
         </div>

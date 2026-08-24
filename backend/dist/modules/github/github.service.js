@@ -293,7 +293,7 @@ export async function processGithubWebhook(signature, eventType, payload, rawBod
                     emitTaskChange(projectId, 'task:updated', task);
                 }
             }
-            await GithubActivityModel.create({
+            const newAct = await GithubActivityModel.create({
                 taskId: matchedTask?._id || undefined,
                 projectId: integration.projectId,
                 type: 'commit',
@@ -303,6 +303,7 @@ export async function processGithubWebhook(signature, eventType, payload, rawBod
                 author: commit.author?.name || commit.author?.username || 'GitHub',
                 action: 'pushed',
             });
+            emitTaskChange(String(integration.projectId), 'github:activity', newAct);
             processedCount++;
         }
     }
@@ -334,7 +335,7 @@ export async function processGithubWebhook(signature, eventType, payload, rawBod
                 emitTaskChange(projectId, 'task:updated', task);
             }
         }
-        await GithubActivityModel.create({
+        const newAct = await GithubActivityModel.create({
             taskId: matchedTask?._id || undefined,
             projectId: integration.projectId,
             type: 'pull_request',
@@ -344,6 +345,7 @@ export async function processGithubWebhook(signature, eventType, payload, rawBod
             author: pr.user?.login || 'GitHub',
             action: actionName,
         });
+        emitTaskChange(String(integration.projectId), 'github:activity', newAct);
         processedCount++;
     }
     // Handler 3: CREATE (Branch) event
@@ -364,7 +366,7 @@ export async function processGithubWebhook(signature, eventType, payload, rawBod
                 emitTaskChange(projectId, 'task:updated', task);
             }
         }
-        await GithubActivityModel.create({
+        const newAct = await GithubActivityModel.create({
             taskId: matchedTask?._id || undefined,
             projectId: integration.projectId,
             type: 'branch',
@@ -374,6 +376,7 @@ export async function processGithubWebhook(signature, eventType, payload, rawBod
             author: payload.sender?.login || 'GitHub',
             action: 'pushed',
         });
+        emitTaskChange(String(integration.projectId), 'github:activity', newAct);
         processedCount++;
     }
     return { message: 'Webhook processed successfully', processedTasks: processedCount };

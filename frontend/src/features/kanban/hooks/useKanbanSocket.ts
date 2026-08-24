@@ -63,10 +63,17 @@ export function useKanbanSocket(projectId: string) {
       void queryClient.invalidateQueries({ queryKey: ['board', projectId] });
     };
 
+    const handleGithubActivity = () => {
+      void queryClient.invalidateQueries({ queryKey: ['github', 'project-activities', projectId] });
+      void queryClient.invalidateQueries({ queryKey: ['github', 'activities'] });
+      void queryClient.invalidateQueries({ queryKey: ['board', projectId] });
+    };
+
     socket.on('task:created', handleTaskChange);
     socket.on('task:moved', handleTaskChange);
     socket.on('task:updated', handleTaskChange);
     socket.on('task:deleted', handleTaskChange);
+    socket.on('github:activity', handleGithubActivity);
 
     socket.on('chat:message', (msg: ChatMessage) => {
       setMessages((prev) => [...prev, msg]);
