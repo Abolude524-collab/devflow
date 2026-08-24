@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+	color: #f1f5f9;
+	background: #0f172a;
+	font-family: 'Geist Sans', sans-serif;
+	font-synthesis: none;
+	text-rendering: optimizeLegibility;
+}
+
+body {
+	min-width: 320px;
+	min-height: 100vh;
+	margin: 0;
+	background: #0f172a;
+}
+
+button,
+input {
+	font: inherit;
+}
+
+input {
+	color: #1e90ff !important;
+	background-color: #0f172a !important;
+	caret-color: #1e90ff;
+}
+
+input::placeholder {
+	color: #94a3b8;
+}
