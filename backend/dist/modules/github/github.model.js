@@ -18,7 +18,7 @@ const githubIntegrationSchema = new Schema({
 }, { timestamps: true });
 githubIntegrationSchema.index({ repoFullName: 1 });
 const githubActivitySchema = new Schema({
-    taskId: { type: Schema.Types.ObjectId, ref: 'Task', required: true, index: true },
+    taskId: { type: Schema.Types.ObjectId, ref: 'Task', required: false, index: true },
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     type: { type: String, enum: ['commit', 'branch', 'pull_request'], required: true },
     refId: { type: String, required: true },

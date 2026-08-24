@@ -27,7 +27,7 @@ export type ActivityType = 'commit' | 'branch' | 'pull_request';
 export type ActivityAction = 'pushed' | 'opened' | 'closed' | 'merged';
 
 export interface GithubActivity {
-  taskId: Types.ObjectId;
+  taskId?: Types.ObjectId;
   projectId: Types.ObjectId;
   type: ActivityType;
   refId: string;
@@ -72,7 +72,7 @@ githubIntegrationSchema.index({ repoFullName: 1 });
 
 const githubActivitySchema = new Schema<GithubActivity>(
   {
-    taskId: { type: Schema.Types.ObjectId, ref: 'Task', required: true, index: true },
+    taskId: { type: Schema.Types.ObjectId, ref: 'Task', required: false, index: true },
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     type: { type: String, enum: ['commit', 'branch', 'pull_request'], required: true },
     refId: { type: String, required: true },

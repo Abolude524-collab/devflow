@@ -323,34 +323,40 @@ export async function processGithubWebhook(
   if (eventType === 'push' && Array.isArray(payload.commits)) {
     for (const commit of payload.commits) {
       const keys = extractTaskKeys(commit.message);
-      for (const key of keys) {
-        const task = await TaskModel.findOne({ projectId, key });
-        if (!task) continue;
+      let matchedTask: any = null;
 
-        const isFix = /\b(fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\b/i.test(commit.message);
+      if (keys.length > 0) {
+        for (const key of keys) {
+          const task = await TaskModel.findOne({ projectId, key });
+          if (!task) continue;
 
-        if (isFix && doneColumn) {
-          task.columnId = doneColumn._id as any;
-          await task.save();
-        } else if (inProgressColumn && String(task.columnId) !== String(doneColumn?._id)) {
-          task.columnId = inProgressColumn._id as any;
-          await task.save();
+          matchedTask = task;
+          const isFix = /\b(fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\b/i.test(commit.message);
+
+          if (isFix && doneColumn) {
+            task.columnId = doneColumn._id as any;
+            await task.save();
+          } else if (inProgressColumn && String(task.columnId) !== String(doneColumn?._id)) {
+            task.columnId = inProgressColumn._id as any;
+            await task.save();
+          }
+
+          emitTaskChange(projectId, 'task:updated', task);
         }
-
-        await GithubActivityModel.create({
-          taskId: task._id,
-          projectId: task.projectId,
-          type: 'commit',
-          refId: commit.id.slice(0, 7),
-          title: commit.message.split('\n')[0],
-          url: commit.url || payload.repository.html_url,
-          author: commit.author?.name || commit.author?.username || 'GitHub',
-          action: 'pushed',
-        });
-
-        emitTaskChange(projectId, 'task:updated', task);
-        processedCount++;
       }
+
+      await GithubActivityModel.create({
+        taskId: matchedTask?._id || undefined,
+        projectId: integration.projectId,
+        type: 'commit',
+        refId: commit.id.slice(0, 7),
+        title: commit.message.split('\n')[0],
+        url: commit.url || payload.repository.html_url,
+        author: commit.author?.name || commit.author?.username || 'GitHub',
+        action: 'pushed',
+      });
+
+      processedCount++;
     }
   }
 
@@ -359,69 +365,77 @@ export async function processGithubWebhook(
     const pr = payload.pull_request;
     const textToSearch = `${pr.title} ${pr.body || ''}`;
     const keys = extractTaskKeys(textToSearch);
+    let matchedTask: any = null;
 
-    for (const key of keys) {
-      const task = await TaskModel.findOne({ projectId, key });
-      if (!task) continue;
+    let actionName: ActivityAction = 'opened';
+    if (pr.merged) actionName = 'merged';
+    else if (payload.action === 'closed') actionName = 'closed';
 
-      let actionName: ActivityAction = 'opened';
-      if (pr.merged) {
-        actionName = 'merged';
-        if (doneColumn) {
+    if (keys.length > 0) {
+      for (const key of keys) {
+        const task = await TaskModel.findOne({ projectId, key });
+        if (!task) continue;
+
+        matchedTask = task;
+        if (pr.merged && doneColumn) {
           task.columnId = doneColumn._id as any;
           await task.save();
+        } else if (inProgressColumn && String(task.columnId) !== String(doneColumn?._id)) {
+          task.columnId = inProgressColumn._id as any;
+          await task.save();
         }
-      } else if (payload.action === 'closed') {
-        actionName = 'closed';
-      } else if (inProgressColumn && String(task.columnId) !== String(doneColumn?._id)) {
-        task.columnId = inProgressColumn._id as any;
-        await task.save();
+
+        emitTaskChange(projectId, 'task:updated', task);
       }
-
-      await GithubActivityModel.create({
-        taskId: task._id,
-        projectId: task.projectId,
-        type: 'pull_request',
-        refId: `#${pr.number}`,
-        title: pr.title,
-        url: pr.html_url,
-        author: pr.user?.login || 'GitHub',
-        action: actionName,
-      });
-
-      emitTaskChange(projectId, 'task:updated', task);
-      processedCount++;
     }
+
+    await GithubActivityModel.create({
+      taskId: matchedTask?._id || undefined,
+      projectId: integration.projectId,
+      type: 'pull_request',
+      refId: `#${pr.number}`,
+      title: pr.title,
+      url: pr.html_url,
+      author: pr.user?.login || 'GitHub',
+      action: actionName,
+    });
+
+    processedCount++;
   }
 
   // Handler 3: CREATE (Branch) event
   if (eventType === 'create' && payload.ref_type === 'branch') {
     const branchName = payload.ref;
     const keys = extractTaskKeys(branchName);
+    let matchedTask: any = null;
 
-    for (const key of keys) {
-      const task = await TaskModel.findOne({ projectId, key });
-      if (!task) continue;
+    if (keys.length > 0) {
+      for (const key of keys) {
+        const task = await TaskModel.findOne({ projectId, key });
+        if (!task) continue;
 
-      if (inProgressColumn && String(task.columnId) !== String(doneColumn?._id)) {
-        task.columnId = inProgressColumn._id as any;
-        await task.save();
+        matchedTask = task;
+        if (inProgressColumn && String(task.columnId) !== String(doneColumn?._id)) {
+          task.columnId = inProgressColumn._id as any;
+          await task.save();
+        }
+
+        emitTaskChange(projectId, 'task:updated', task);
       }
-
-      await GithubActivityModel.create({
-        taskId: task._id,
-        projectId: task.projectId,
-        type: 'branch',
-        refId: branchName,
-        title: `Branch '${branchName}' created`,
-        url: `${payload.repository.html_url}/tree/${branchName}`,
-        author: payload.sender?.login || 'GitHub',
-        action: 'pushed',
-      });
-
-      emitTaskChange(projectId, 'task:updated', task);
-      processedCount++;
     }
+
+    await GithubActivityModel.create({
+      taskId: matchedTask?._id || undefined,
+      projectId: integration.projectId,
+      type: 'branch',
+      refId: branchName,
+      title: `Branch '${branchName}' created`,
+      url: `${payload.repository.html_url}/tree/${branchName}`,
+      author: payload.sender?.login || 'GitHub',
+      action: 'pushed',
+    });
+
+    processedCount++;
   }
 
   return { message: 'Webhook processed successfully', processedTasks: processedCount };
