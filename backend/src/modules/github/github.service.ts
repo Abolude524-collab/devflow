@@ -234,6 +234,26 @@ export async function getTaskGithubActivities(taskId: string, userId: string) {
     type: a.type,
     refId: a.refId,
     title: a.title,
+    action: a.action,
+    createdAt: a.createdAt.toISOString(),
+  }));
+}
+
+export async function getProjectGithubActivities(projectId: string, userId: string) {
+  if (!isValidObjectId(projectId)) throw new GithubError('Project not found');
+  const project = await ProjectModel.findById(projectId);
+  if (!project) throw new GithubError('Project not found');
+
+  const isMember = await WorkspaceModel.exists({ _id: project.workspaceId, 'members.userId': userId });
+  if (!isMember) throw new GithubError('Access denied');
+
+  const activities = await GithubActivityModel.find({ projectId }).sort({ createdAt: -1 }).limit(20);
+  return activities.map((a) => ({
+    id: a.id,
+    taskId: String(a.taskId),
+    type: a.type,
+    refId: a.refId,
+    title: a.title,
     url: a.url,
     author: a.author,
     action: a.action,

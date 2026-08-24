@@ -13,6 +13,7 @@ import {
   type TaskPriority,
 } from '../kanban.api';
 import { LinkGithubModal } from '../../github/LinkGithubModal';
+import { ProjectGithubActivityFeed } from '../../github/ProjectGithubActivityFeed';
 import { NotificationBell } from '../../notifications/NotificationBell';
 import { useKanbanSocket } from '../hooks/useKanbanSocket';
 import { CreateTaskModal } from './CreateTaskModal';
@@ -196,7 +197,7 @@ export const BoardView: React.FC<BoardViewProps> = ({ projectId, onBack }) => {
   }
 
   return (
-    <section className="mx-auto flex h-[calc(100vh-6rem)] w-full max-w-7xl flex-col">
+    <section className="mx-auto flex min-h-screen w-full max-w-7xl flex-col pb-16">
       {/* Navigation & Real-time Presence Header */}
       <header className="flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
@@ -297,6 +298,9 @@ export const BoardView: React.FC<BoardViewProps> = ({ projectId, onBack }) => {
           />
         ))}
       </div>
+
+      {/* GitHub Project Activity Stream (below Kanban board) */}
+      <ProjectGithubActivityFeed projectId={project.id} />
 
       {/* Create / Edit Modal */}
       <CreateTaskModal

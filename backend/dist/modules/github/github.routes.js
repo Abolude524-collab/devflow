@@ -1,4 +1,4 @@
-import { getGithubAccountController, getGithubAuthUrlController, getProjectGithubIntegrationController, getTaskGithubActivitiesController, getUserGithubReposController, githubCallbackController, githubWebhookController, linkProjectGithubRepoController, unlinkProjectGithubRepoController, } from './github.controller.js';
+import { getGithubAccountController, getGithubAuthUrlController, getProjectGithubActivitiesController, getProjectGithubIntegrationController, getTaskGithubActivitiesController, getUserGithubReposController, githubCallbackController, githubWebhookController, linkProjectGithubRepoController, unlinkProjectGithubRepoController, } from './github.controller.js';
 const githubRoutes = async (fastify) => {
     // OAuth & Account
     fastify.get('/github/auth-url', getGithubAuthUrlController);
@@ -9,7 +9,8 @@ const githubRoutes = async (fastify) => {
     fastify.get('/projects/:projectId/github', getProjectGithubIntegrationController);
     fastify.post('/projects/:projectId/github/link', linkProjectGithubRepoController);
     fastify.delete('/projects/:projectId/github/unlink', unlinkProjectGithubRepoController);
-    // Task Activity Log
+    // Activity Logs
+    fastify.get('/projects/:projectId/github-activities', getProjectGithubActivitiesController);
     fastify.get('/tasks/:taskId/github-activities', getTaskGithubActivitiesController);
     // Ingestion Webhook Listener
     fastify.post('/github/webhook', githubWebhookController);

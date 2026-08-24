@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import {
   getGithubAccountController,
   getGithubAuthUrlController,
+  getProjectGithubActivitiesController,
   getProjectGithubIntegrationController,
   getTaskGithubActivitiesController,
   getUserGithubReposController,
@@ -23,7 +24,8 @@ const githubRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/projects/:projectId/github/link', linkProjectGithubRepoController);
   fastify.delete('/projects/:projectId/github/unlink', unlinkProjectGithubRepoController);
 
-  // Task Activity Log
+  // Activity Logs
+  fastify.get('/projects/:projectId/github-activities', getProjectGithubActivitiesController);
   fastify.get('/tasks/:taskId/github-activities', getTaskGithubActivitiesController);
 
   // Ingestion Webhook Listener

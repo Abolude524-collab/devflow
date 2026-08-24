@@ -108,3 +108,10 @@ export async function getTaskGithubActivities(token: string, taskId: string): Pr
   });
   return parseResponse<GithubTaskActivity[]>(response, 'Unable to load task GitHub activity log');
 }
+
+export async function getProjectGithubActivities(token: string, projectId: string): Promise<GithubTaskActivity[]> {
+  const response = await fetch(`${apiUrl}/api/projects/${projectId}/github-activities`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return parseResponse<GithubTaskActivity[]>(response, 'Unable to load project GitHub activity stream');
+}

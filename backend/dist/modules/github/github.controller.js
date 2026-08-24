@@ -1,6 +1,6 @@
 import { env } from '../../config/env.js';
 import { projectParamsSchema } from '../kanban/kanban.schema.js';
-import { getGithubAccount, getGithubAuthUrl, getProjectGithubIntegration, getTaskGithubActivities, getUserGithubRepos, GithubError, handleGithubCallback, linkProjectGithubRepo, processGithubWebhook, unlinkProjectGithubRepo, } from './github.service.js';
+import { getGithubAccount, getGithubAuthUrl, getProjectGithubActivities, getProjectGithubIntegration, getTaskGithubActivities, getUserGithubRepos, GithubError, handleGithubCallback, linkProjectGithubRepo, processGithubWebhook, unlinkProjectGithubRepo, } from './github.service.js';
 function getUserId(request) {
     return request.user.sub;
 }
@@ -95,6 +95,18 @@ export async function getTaskGithubActivitiesController(request, reply) {
         await request.jwtVerify();
         const { taskId } = request.params;
         return reply.send(await getTaskGithubActivities(taskId, getUserId(request)));
+    }
+    catch (error) {
+        if (error instanceof GithubError)
+            return reply.code(400).send({ message: error.message });
+        return reply.code(401).send({ message: 'Authentication required' });
+    }
+}
+export async function getProjectGithubActivitiesController(request, reply) {
+    try {
+        await request.jwtVerify();
+        const { projectId } = projectParamsSchema.parse(request.params);
+        return reply.send(await getProjectGithubActivities(projectId, getUserId(request)));
     }
     catch (error) {
         if (error instanceof GithubError)

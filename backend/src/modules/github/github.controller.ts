@@ -4,6 +4,7 @@ import { projectParamsSchema } from '../kanban/kanban.schema.js';
 import {
   getGithubAccount,
   getGithubAuthUrl,
+  getProjectGithubActivities,
   getProjectGithubIntegration,
   getTaskGithubActivities,
   getUserGithubRepos,
@@ -106,6 +107,17 @@ export async function getTaskGithubActivitiesController(request: FastifyRequest,
     await request.jwtVerify();
     const { taskId } = request.params as { taskId: string };
     return reply.send(await getTaskGithubActivities(taskId, getUserId(request)));
+  } catch (error) {
+    if (error instanceof GithubError) return reply.code(400).send({ message: error.message });
+    return reply.code(401).send({ message: 'Authentication required' });
+  }
+}
+
+export async function getProjectGithubActivitiesController(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    await request.jwtVerify();
+    const { projectId } = projectParamsSchema.parse(request.params);
+    return reply.send(await getProjectGithubActivities(projectId, getUserId(request)));
   } catch (error) {
     if (error instanceof GithubError) return reply.code(400).send({ message: error.message });
     return reply.code(401).send({ message: 'Authentication required' });
