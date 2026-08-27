@@ -115,3 +115,21 @@ export async function getProjectGithubActivities(token: string, projectId: strin
   });
   return parseResponse<GithubTaskActivity[]>(response, 'Unable to load project GitHub activity stream');
 }
+
+export async function simulateGithubWebhook(
+  token: string,
+  projectId: string,
+  eventType: 'push' | 'pull_request' | 'issues',
+  taskKey?: string,
+): Promise<{ message: string; processedTasks: number }> {
+  const response = await fetch(`${apiUrl}/api/projects/${projectId}/github/simulate-webhook`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ eventType, taskKey }),
+  });
+  return parseResponse<{ message: string; processedTasks: number }>(response, 'Unable to simulate webhook event');
+}
+

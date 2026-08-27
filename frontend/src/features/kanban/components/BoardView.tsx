@@ -40,7 +40,8 @@ export const BoardView: React.FC<BoardViewProps> = ({ projectId, onBack }) => {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   // Connect Socket.io for real-time sync, presence, and chat
-  const { presence, messages, typingUsers, sendMessage, setTyping } = useKanbanSocket(projectId);
+  const { presence, messages, typingUsers, activeChannel, setActiveChannel, sendMessage, setTyping } =
+    useKanbanSocket(projectId);
 
   const boardQuery = useQuery({
     queryKey: ['board', projectId],
@@ -335,8 +336,11 @@ export const BoardView: React.FC<BoardViewProps> = ({ projectId, onBack }) => {
       <ProjectChatDrawer
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
+        projectId={projectId}
         messages={messages}
         typingUsers={typingUsers}
+        activeChannel={activeChannel}
+        onChannelChange={setActiveChannel}
         onSendMessage={sendMessage}
         onTyping={setTyping}
       />

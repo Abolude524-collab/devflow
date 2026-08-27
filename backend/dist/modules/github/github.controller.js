@@ -1,6 +1,6 @@
 import { env } from '../../config/env.js';
 import { projectParamsSchema } from '../kanban/kanban.schema.js';
-import { getGithubAccount, getGithubAuthUrl, getProjectGithubActivities, getProjectGithubIntegration, getTaskGithubActivities, getUserGithubRepos, GithubError, handleGithubCallback, linkProjectGithubRepo, processGithubWebhook, unlinkProjectGithubRepo, } from './github.service.js';
+import { getGithubAccount, getGithubAuthUrl, getProjectGithubActivities, getProjectGithubIntegration, getTaskGithubActivities, getUserGithubRepos, GithubError, handleGithubCallback, linkProjectGithubRepo, processGithubWebhook, simulateGithubWebhook, unlinkProjectGithubRepo, } from './github.service.js';
 function getUserId(request) {
     return request.user.sub;
 }
@@ -128,5 +128,19 @@ export async function githubWebhookController(request, reply) {
         if (error instanceof GithubError)
             return reply.code(401).send({ message: error.message });
         return reply.code(500).send({ message: 'Webhook processing error' });
+    }
+}
+export async function simulateGithubWebhookController(request, reply) {
+    try {
+        await request.jwtVerify();
+        const { projectId } = projectParamsSchema.parse(request.params);
+        const body = request.body;
+        const eventType = body?.eventType || 'push';
+        return reply.send(await simulateGithubWebhook(projectId, getUserId(request), eventType, body?.taskKey));
+    }
+    catch (error) {
+        if (error instanceof GithubError)
+            return reply.code(400).send({ message: error.message });
+        return reply.code(401).send({ message: 'Authentication required' });
     }
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Task, TaskPriority } from '../kanban.api';
 
 interface TaskCardProps {
@@ -15,11 +15,20 @@ const PRIORITY_STYLES: Record<TaskPriority, { label: string; badgeClass: string 
 };
 
 export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete }) => {
+  const [copied, setCopied] = useState(false);
   const priority = PRIORITY_STYLES[task.priority] ?? PRIORITY_STYLES.medium;
 
   function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
     event.dataTransfer.setData('text/plain', task.id);
     event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleCopyBranch(e: React.MouseEvent) {
+    e.stopPropagation();
+    const branchCmd = `git checkout -b feature/${task.key}`;
+    void navigator.clipboard.writeText(branchCmd);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   // Calculate due date status
@@ -55,9 +64,20 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete }) =>
       className="group relative cursor-grab rounded-xl border border-white/10 bg-devflow-surface/90 p-4 transition-all hover:border-devflow-accent/40 hover:shadow-lg hover:shadow-devflow-accent/5 active:cursor-grabbing active:scale-[0.99]"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-devflow-accent">
-          {task.key}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-devflow-accent">
+            {task.key}
+          </span>
+          <button
+            type="button"
+            onClick={handleCopyBranch}
+            className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] font-mono text-devflow-muted transition hover:bg-devflow-accent/20 hover:text-devflow-accent"
+            title="Copy Git branch command"
+          >
+            {copied ? '✓ Copied!' : '🌱 Git'}
+          </button>
+        </div>
+
         <span
           className={`rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wide ${priority.badgeClass}`}
         >

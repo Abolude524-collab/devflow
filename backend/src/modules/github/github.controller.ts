@@ -12,6 +12,7 @@ import {
   handleGithubCallback,
   linkProjectGithubRepo,
   processGithubWebhook,
+  simulateGithubWebhook,
   unlinkProjectGithubRepo,
 } from './github.service.js';
 
@@ -139,3 +140,18 @@ export async function githubWebhookController(request: FastifyRequest, reply: Fa
     return reply.code(500).send({ message: 'Webhook processing error' });
   }
 }
+
+export async function simulateGithubWebhookController(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    await request.jwtVerify();
+    const { projectId } = projectParamsSchema.parse(request.params);
+    const body = request.body as { eventType?: 'push' | 'pull_request' | 'issues'; taskKey?: string };
+    const eventType = body?.eventType || 'push';
+
+    return reply.send(await simulateGithubWebhook(projectId, getUserId(request), eventType, body?.taskKey));
+  } catch (error) {
+    if (error instanceof GithubError) return reply.code(400).send({ message: error.message });
+    return reply.code(401).send({ message: 'Authentication required' });
+  }
+}
+

@@ -9,10 +9,19 @@ export interface SocketUser {
   email: string;
 }
 
+export interface ChatAttachment {
+  url: string;
+  fileName: string;
+  fileType: 'image' | 'video' | 'audio' | 'document' | 'other';
+  fileSize: number;
+}
+
 export interface ChatMessage {
   id: string;
   projectId: string;
+  channelId?: string;
   text: string;
+  attachments?: ChatAttachment[];
   user: SocketUser;
   createdAt: string;
 }
@@ -25,14 +34,15 @@ export function useKanbanSocket(projectId: string) {
   const [presence, setPresence] = useState<SocketUser[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [activeChannel, setActiveChannel] = useState<string>('general');
 
   useEffect(() => {
     if (!token || !projectId) return;
 
     const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
-    // Seed chat state with persistent history from MongoDB
-    fetch(`${apiUrl}/api/projects/${projectId}/messages`, {
+    // Seed chat state with persistent history from MongoDB for active channel
+    fetch(`${apiUrl}/api/projects/${projectId}/messages?channelId=${activeChannel}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
@@ -46,7 +56,7 @@ export function useKanbanSocket(projectId: string) {
 
     socketRef.current = socket;
 
-    socket.on('connect_error', (err) => {
+    socket.on('connect_error', () => {
       // Suppress unhandled socket connection errors
     });
 
@@ -76,7 +86,10 @@ export function useKanbanSocket(projectId: string) {
     socket.on('github:activity', handleGithubActivity);
 
     socket.on('chat:message', (msg: ChatMessage) => {
-      setMessages((prev) => [...prev, msg]);
+      // Add message if it matches active channel or has no channel specified (legacy)
+      if (!msg.channelId || msg.channelId === activeChannel) {
+        setMessages((prev) => [...prev, msg]);
+      }
     });
 
     socket.on('chat:typing', ({ user, isTyping }: { user: { id: string; name: string }; isTyping: boolean }) => {
@@ -94,11 +107,16 @@ export function useKanbanSocket(projectId: string) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token, projectId, queryClient]);
+  }, [token, projectId, activeChannel, queryClient]);
 
-  function sendMessage(text: string) {
-    if (socketRef.current && text.trim()) {
-      socketRef.current.emit('chat:send', { projectId, text });
+  function sendMessage(text: string, attachments: ChatAttachment[] = [], channelId = activeChannel) {
+    if (socketRef.current && (text.trim() || attachments.length > 0)) {
+      socketRef.current.emit('chat:send', {
+        projectId,
+        channelId,
+        text,
+        attachments,
+      });
     }
   }
 
@@ -112,7 +130,10 @@ export function useKanbanSocket(projectId: string) {
     presence,
     messages,
     typingUsers,
+    activeChannel,
+    setActiveChannel,
     sendMessage,
     setTyping,
   };
 }
+

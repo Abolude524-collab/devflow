@@ -90,11 +90,13 @@ export default fp(async (fastify) => {
             if (currentProjectId === projectId)
                 currentProjectId = null;
         });
-        socket.on('chat:send', async ({ projectId, text }) => {
-            if (!projectId || !text.trim())
+        socket.on('chat:send', async ({ projectId, text, attachments, channelId = 'general', }) => {
+            if (!projectId)
+                return;
+            if (!text?.trim() && (!attachments || attachments.length === 0))
                 return;
             try {
-                const message = await saveChatMessage(projectId, user.id, text);
+                const message = await saveChatMessage(projectId, user.id, text || '', attachments || [], channelId);
                 io.to(`project:${projectId}`).emit('chat:message', message);
             }
             catch (err) {

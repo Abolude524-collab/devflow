@@ -120,15 +120,35 @@ export default fp(async (fastify) => {
       if (currentProjectId === projectId) currentProjectId = null;
     });
 
-    socket.on('chat:send', async ({ projectId, text }: { projectId: string; text: string }) => {
-      if (!projectId || !text.trim()) return;
-      try {
-        const message = await saveChatMessage(projectId, user.id, text);
-        io.to(`project:${projectId}`).emit('chat:message', message);
-      } catch (err) {
-        socket.emit('error', { message: 'Failed to send chat message' });
-      }
-    });
+    socket.on(
+      'chat:send',
+      async ({
+        projectId,
+        text,
+        attachments,
+        channelId = 'general',
+      }: {
+        projectId: string;
+        text?: string;
+        attachments?: Array<{
+          url: string;
+          fileName: string;
+          fileType: 'image' | 'video' | 'audio' | 'document' | 'other';
+          fileSize: number;
+        }>;
+        channelId?: string;
+      }) => {
+        if (!projectId) return;
+        if (!text?.trim() && (!attachments || attachments.length === 0)) return;
+        try {
+          const message = await saveChatMessage(projectId, user.id, text || '', attachments || [], channelId);
+          io.to(`project:${projectId}`).emit('chat:message', message);
+        } catch (err) {
+          socket.emit('error', { message: 'Failed to send chat message' });
+        }
+      },
+    );
+
 
     socket.on('chat:typing', ({ projectId, isTyping }: { projectId: string; isTyping: boolean }) => {
       if (!projectId) return;

@@ -167,6 +167,40 @@ export async function linkProjectGithubRepo(projectId: string, userId: string, r
   const repoData = (await repoRes.json()) as { id: number; full_name: string; html_url: string };
   const webhookSecret = crypto.randomBytes(24).toString('hex');
 
+  // Attempt to automatically register the webhook on GitHub via REST API
+  let webhookId: number | undefined;
+  try {
+    const appUrl = process.env.VITE_API_URL || 'http://localhost:3000';
+    const webhookUrl = `${appUrl}/api/github/webhook`;
+
+    const hookRes = await fetch(`https://api.github.com/repos/${repoFullName}/hooks`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${account.accessToken}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'DevFlow-App',
+      },
+      body: JSON.stringify({
+        name: 'web',
+        active: true,
+        events: ['push', 'pull_request', 'issues', 'create'],
+        config: {
+          url: webhookUrl,
+          content_type: 'json',
+          secret: webhookSecret,
+          insecure_ssl: '0',
+        },
+      }),
+    });
+
+    if (hookRes.ok) {
+      const hookData = (await hookRes.json()) as { id: number };
+      webhookId = hookData.id;
+    }
+  } catch (err) {
+    // Ignore error if webhook creation fails due to local dev URL or scope
+  }
+
   const integration = await GithubIntegrationModel.findOneAndUpdate(
     { projectId: project._id },
     {
@@ -174,6 +208,7 @@ export async function linkProjectGithubRepo(projectId: string, userId: string, r
       repoId: repoData.id,
       repoFullName: repoData.full_name,
       repoUrl: repoData.html_url,
+      webhookId,
       webhookSecret,
       installedBy: userId,
     },
@@ -186,6 +221,7 @@ export async function linkProjectGithubRepo(projectId: string, userId: string, r
     repoFullName: integration.repoFullName,
     repoUrl: integration.repoUrl,
     webhookSecret: integration.webhookSecret,
+    webhookId: integration.webhookId,
   };
 }
 
@@ -216,6 +252,7 @@ export async function getProjectGithubIntegration(projectId: string, userId: str
     id: integration.id,
     repoFullName: integration.repoFullName,
     repoUrl: integration.repoUrl,
+    webhookSecret: integration.webhookSecret,
     createdAt: integration.createdAt.toISOString(),
   };
 }
@@ -248,9 +285,10 @@ export async function getProjectGithubActivities(projectId: string, userId: stri
   if (!isMember) throw new GithubError('Access denied');
 
   const activities = await GithubActivityModel.find({ projectId }).sort({ createdAt: -1 }).limit(20);
+
   return activities.map((a) => ({
     id: a.id,
-    taskId: String(a.taskId),
+    taskId: a.taskId ? String(a.taskId) : undefined,
     type: a.type,
     refId: a.refId,
     title: a.title,
@@ -287,7 +325,7 @@ export async function processGithubWebhook(
     return { message: `No DevFlow integration found for repo ${repoFullName}` };
   }
 
-  // HMAC Signature Verification
+  // HMAC Signature Verification (if signature provided and secret is configured)
   const secretKey = process.env.GITHUB_WEBHOOK_SECRET || env.GITHUB_WEBHOOK_SECRET || integration.webhookSecret;
   if (signature && secretKey && env.NODE_ENV === 'production') {
     const expectedSig = `sha256=${crypto
@@ -313,6 +351,7 @@ export async function processGithubWebhook(
 
   const projectId = String(integration.projectId);
   const columns = await ColumnModel.find({ boardId: { $in: await TaskModel.distinct('boardId', { projectId }) } });
+  const backlogColumn = columns[0];
   const inProgressColumn = columns.find((c) => c.name.toLowerCase().includes('progress')) || columns[1] || columns[0];
   const doneColumn = columns.find((c) => c.name.toLowerCase().includes('done')) || columns[columns.length - 1];
 
@@ -440,5 +479,145 @@ export async function processGithubWebhook(
     processedCount++;
   }
 
+  // Handler 4: ISSUES event (2-Way Sync)
+  if (eventType === 'issues' && payload.issue) {
+    const issue = payload.issue;
+    const action = payload.action as 'opened' | 'closed' | 'reopened';
+    const textToSearch = `${issue.title} ${issue.body || ''}`;
+    const keys = extractTaskKeys(textToSearch);
+    let matchedTask: any = null;
+
+    if (keys.length > 0) {
+      for (const key of keys) {
+        const task = await TaskModel.findOne({ projectId, key });
+        if (task) {
+          matchedTask = task;
+          if (action === 'closed' && doneColumn) {
+            task.columnId = doneColumn._id as any;
+            await task.save();
+          } else if (action === 'reopened' && inProgressColumn) {
+            task.columnId = inProgressColumn._id as any;
+            await task.save();
+          }
+          emitTaskChange(projectId, 'task:updated', task);
+        }
+      }
+    }
+
+    // Auto-create task if issue opened and no task matched
+    if (action === 'opened' && !matchedTask && backlogColumn) {
+      const lastTask = await TaskModel.findOne({ projectId }).sort({ createdAt: -1 });
+      let nextNum = 1;
+      let projectKey = 'DEV';
+      if (lastTask?.key) {
+        const parts = lastTask.key.split('-');
+        if (parts.length === 2) {
+          projectKey = parts[0];
+          nextNum = (parseInt(parts[1], 10) || 0) + 1;
+        }
+      }
+      const taskKey = `${projectKey}-${nextNum}`;
+
+      matchedTask = await TaskModel.create({
+        projectId: integration.projectId,
+        boardId: backlogColumn.boardId,
+        columnId: backlogColumn._id,
+        key: taskKey,
+        title: `[GitHub #${issue.number}] ${issue.title}`,
+        description: `${issue.body || ''}\n\n[View GitHub Issue](${issue.html_url})`,
+        priority: 'medium',
+        order: 0,
+      });
+
+      emitTaskChange(projectId, 'task:created', matchedTask);
+    }
+
+    const newAct = await GithubActivityModel.create({
+      taskId: matchedTask?._id || undefined,
+      projectId: integration.projectId,
+      type: 'issue',
+      refId: `#${issue.number}`,
+      title: issue.title,
+      url: issue.html_url,
+      author: issue.user?.login || 'GitHub',
+      action: action === 'reopened' ? 'reopened' : action === 'closed' ? 'closed' : 'opened',
+    });
+
+    emitTaskChange(String(integration.projectId), 'github:activity', newAct);
+    processedCount++;
+  }
+
   return { message: 'Webhook processed successfully', processedTasks: processedCount };
+}
+
+export async function simulateGithubWebhook(
+  projectId: string,
+  userId: string,
+  eventType: 'push' | 'pull_request' | 'issues',
+  taskKey?: string,
+) {
+  if (!isValidObjectId(projectId)) throw new GithubError('Project not found');
+  const project = await ProjectModel.findById(projectId);
+  if (!project) throw new GithubError('Project not found');
+
+  const isMember = await WorkspaceModel.exists({ _id: project.workspaceId, 'members.userId': userId });
+  if (!isMember) throw new GithubError('Access denied');
+
+  let integration = await GithubIntegrationModel.findOne({ projectId: project._id });
+  if (!integration) {
+    // Create mock integration if missing for simulation
+    integration = await GithubIntegrationModel.create({
+      projectId: project._id,
+      workspaceId: project.workspaceId,
+      repoId: 10001,
+      repoFullName: 'devflow/demo-repo',
+      repoUrl: 'https://github.com/devflow/demo-repo',
+      webhookSecret: 'demo-secret-key',
+      installedBy: userId,
+    });
+  }
+
+  const keyToUse = taskKey || 'DEVFLOW-1';
+
+  let mockPayload: any;
+  if (eventType === 'push') {
+    mockPayload = {
+      repository: { full_name: integration.repoFullName, html_url: integration.repoUrl },
+      commits: [
+        {
+          id: crypto.randomBytes(4).toString('hex'),
+          message: `fix: resolve issue for task ${keyToUse}`,
+          url: `${integration.repoUrl}/commit/demo`,
+          author: { name: 'DevFlow Simulator' },
+        },
+      ],
+    };
+  } else if (eventType === 'pull_request') {
+    mockPayload = {
+      repository: { full_name: integration.repoFullName, html_url: integration.repoUrl },
+      action: 'closed',
+      pull_request: {
+        number: Math.floor(Math.random() * 90 + 10),
+        title: `Merge feature implementation for ${keyToUse}`,
+        body: `Fixes ${keyToUse} and updates components.`,
+        html_url: `${integration.repoUrl}/pull/demo`,
+        merged: true,
+        user: { login: 'DevFlow Simulator' },
+      },
+    };
+  } else {
+    mockPayload = {
+      repository: { full_name: integration.repoFullName, html_url: integration.repoUrl },
+      action: 'opened',
+      issue: {
+        number: Math.floor(Math.random() * 90 + 100),
+        title: `Bug reported in UI layout (${keyToUse})`,
+        body: 'Please investigate rendering glitch on Kanban card.',
+        html_url: `${integration.repoUrl}/issues/demo`,
+        user: { login: 'DevFlow Simulator' },
+      },
+    };
+  }
+
+  return processGithubWebhook('simulated-signature', eventType, mockPayload, JSON.stringify(mockPayload));
 }

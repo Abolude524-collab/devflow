@@ -23,8 +23,8 @@ export interface GithubIntegration {
   updatedAt: Date;
 }
 
-export type ActivityType = 'commit' | 'branch' | 'pull_request';
-export type ActivityAction = 'pushed' | 'opened' | 'closed' | 'merged';
+export type ActivityType = 'commit' | 'branch' | 'pull_request' | 'issue';
+export type ActivityAction = 'pushed' | 'opened' | 'closed' | 'merged' | 'reopened';
 
 export interface GithubActivity {
   taskId?: Types.ObjectId;
@@ -74,12 +74,12 @@ const githubActivitySchema = new Schema<GithubActivity>(
   {
     taskId: { type: Schema.Types.ObjectId, ref: 'Task', required: false, index: true },
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
-    type: { type: String, enum: ['commit', 'branch', 'pull_request'], required: true },
+    type: { type: String, enum: ['commit', 'branch', 'pull_request', 'issue'], required: true },
     refId: { type: String, required: true },
     title: { type: String, required: true },
     url: { type: String, required: true },
     author: { type: String, required: true },
-    action: { type: String, enum: ['pushed', 'opened', 'closed', 'merged'], required: true },
+    action: { type: String, enum: ['pushed', 'opened', 'closed', 'merged', 'reopened'], required: true },
   },
   { timestamps: true },
 );

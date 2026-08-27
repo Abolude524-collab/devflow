@@ -7,6 +7,7 @@ import {
   getProjectGithubIntegration,
   getUserGithubRepos,
   linkProjectGithubRepo,
+  simulateGithubWebhook,
   unlinkProjectGithubRepo,
 } from './github.api';
 
@@ -26,6 +27,8 @@ export const LinkGithubModal: React.FC<LinkGithubModalProps> = ({
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
   const [selectedRepo, setSelectedRepo] = useState('');
+  const [simTaskKey, setSimTaskKey] = useState('DEVFLOW-1');
+  const [simMessage, setSimMessage] = useState<string | null>(null);
 
   const accountQuery = useQuery({
     queryKey: ['github', 'account'],
@@ -67,6 +70,17 @@ export const LinkGithubModal: React.FC<LinkGithubModalProps> = ({
     },
   });
 
+  const simulateMutation = useMutation({
+    mutationFn: (eventType: 'push' | 'pull_request' | 'issues') =>
+      simulateGithubWebhook(token!, projectId, eventType, simTaskKey),
+    onSuccess: (res) => {
+      setSimMessage(`✅ Simulated event successfully! Processed ${res.processedTasks} task(s).`);
+      void queryClient.invalidateQueries({ queryKey: ['board', projectId] });
+      void queryClient.invalidateQueries({ queryKey: ['github', 'activities'] });
+      setTimeout(() => setSimMessage(null), 4000);
+    },
+  });
+
   if (!isOpen) return null;
 
   const isConnected = accountQuery.data?.connected;
@@ -76,7 +90,7 @@ export const LinkGithubModal: React.FC<LinkGithubModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div onClick={onClose} className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity" />
 
-      <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-devflow-surface p-6 shadow-2xl transition-all">
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-devflow-surface p-6 shadow-2xl transition-all custom-scrollbar">
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-2.5">
             <span className="text-xl">🐙</span>
@@ -84,7 +98,7 @@ export const LinkGithubModal: React.FC<LinkGithubModalProps> = ({
               <p className="font-mono text-xs font-semibold uppercase tracking-widest text-devflow-accent">
                 Integrations
               </p>
-              <h3 className="text-xl font-bold text-devflow-text">GitHub Integration</h3>
+              <h3 className="text-xl font-bold text-devflow-text">GitHub Automation</h3>
             </div>
           </div>
           <button
@@ -194,6 +208,64 @@ export const LinkGithubModal: React.FC<LinkGithubModalProps> = ({
               )}
             </div>
           )}
+
+          {/* Webhook Event Simulator Widget */}
+          <div className="border-t border-white/10 pt-4">
+            <h4 className="font-bold text-xs uppercase tracking-wider text-devflow-text flex items-center gap-1.5">
+              <span>⚡</span> Webhook Event Simulator
+            </h4>
+            <p className="mt-1 text-xs text-devflow-muted">
+              Simulate live GitHub webhook triggers locally to test automatic task movement and activity feed sync.
+            </p>
+
+            <div className="mt-3 space-y-3">
+              <div>
+                <label className="block text-[11px] font-mono text-devflow-muted">Target Task Key:</label>
+                <input
+                  type="text"
+                  value={simTaskKey}
+                  onChange={(e) => setSimTaskKey(e.target.value)}
+                  placeholder="e.g. DEVFLOW-1"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-devflow-background px-3 py-1.5 font-mono text-xs text-devflow-text outline-none focus:border-devflow-accent"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={simulateMutation.isPending}
+                  onClick={() => simulateMutation.mutate('push')}
+                  className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-devflow-text transition hover:bg-white/10 disabled:opacity-50"
+                >
+                  🚀 Push Commit (`fix: {simTaskKey}`)
+                </button>
+
+                <button
+                  type="button"
+                  disabled={simulateMutation.isPending}
+                  onClick={() => simulateMutation.mutate('pull_request')}
+                  className="flex-1 rounded-lg border border-devflow-accent/30 bg-devflow-accent/10 px-3 py-2 text-xs font-medium text-devflow-accent transition hover:bg-devflow-accent/20 disabled:opacity-50"
+                >
+                  🔀 Merge PR (`{simTaskKey}`)
+                </button>
+
+                <button
+                  type="button"
+                  disabled={simulateMutation.isPending}
+                  onClick={() => simulateMutation.mutate('issues')}
+                  className="flex-1 rounded-lg border border-devflow-success/30 bg-devflow-success/10 px-3 py-2 text-xs font-medium text-devflow-success transition hover:bg-devflow-success/20 disabled:opacity-50"
+                >
+                  🐛 Open Issue Sync
+                </button>
+              </div>
+
+              {simMessage && (
+                <div className="rounded-lg bg-devflow-success/15 p-2.5 text-xs text-devflow-success border border-devflow-success/30 animate-pulse">
+                  {simMessage}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
